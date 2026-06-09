@@ -1,1 +1,383 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Space Hunt - Stealth Arcade</title>
+    <style>
+        * { box-sizing: border-box; user-select: none; touch-action: none; }
+        body {
+            margin: 0; padding: 0; background: #0b0c10;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh; color: #fff; overflow: hidden;
+        }
+        #game-container {
+            width: 100%; max-width: 400px; height: 600px;
+            background: #1f2833;
+            position: relative; overflow: hidden; border: 4px solid #45f3ff; border-radius: 12px;
+            box-shadow: 0 0 20px rgba(69, 243, 255, 0.3);
+        }
+        canvas { display: block; background: #11141a; }
+        
+        /* HUD Top Layer */
+        .hud {
+            position: absolute; top: 12px; left: 12px; right: 12px;
+            display: flex; justify-content: space-between; pointer-events: none;
+            z-index: 5;
+        }
+        .hud-item {
+            background: rgba(0, 0, 0, 0.7); padding: 6px 14px; border-radius: 20px;
+            font-weight: bold; font-size: 13px; border: 1px solid #45f3ff;
+            letter-spacing: 1px;
+        }
+
+        /* Action Controls Block */
+        .control-bar {
+            position: absolute; bottom: 20px; left: 0; right: 0;
+            display: flex; justify-content: center; gap: 20px; z-index: 5;
+            padding: 0 20px;
+        }
+        .action-btn {
+            background: #ff3333; color: #fff; border: none; width: 75px; height: 75px;
+            border-radius: 50%; font-weight: bold; font-size: 16px; cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 51, 51, 0.4); border: 2px solid #fff;
+        }
+        .action-btn:active { transform: scale(0.9); }
+        .vent-btn { background: #00bfff; box-shadow: 0 4px 15px rgba(0, 191, 255, 0.4); }
+
+        /* Full Screen Overlays */
+        .screen {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(11, 12, 16, 0.95); display: flex; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 10; padding: 25px;
+            text-align: center;
+        }
+        .screen h1 { color: #45f3ff; font-size: 36px; margin: 0 0 10px 0; text-shadow: 0 0 10px rgba(69,243,255,0.5); }
+        .screen p { font-size: 14px; margin: 0 0 25px 0; color: #c5a1ff; font-weight: bold; }
+        
+        button.menu-btn {
+            background: #45f3ff; color: #0b0c10; border: none; padding: 14px 35px;
+            font-size: 16px; font-weight: bold; border-radius: 25px; cursor: pointer;
+            box-shadow: 0 4px 10px rgba(69,243,255,0.3); width: 85%; margin: 8px 0;
+        }
+        button.menu-btn:active { transform: scale(0.95); }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div class="hud">
+            <div class="hud-item">TARGETS LEFT: <span id="hud-left">0</span></div>
+            <div class="hud-item" style="color: #ff3333;">ROLE: IMPOSTOR</div>
+        </div>
+
+        <canvas id="spaceCanvas" width="400" height="600"></canvas>
+
+        <div class="control-bar" id="game-controls" style="display: none;">
+            <button class="action-btn vent-btn" onclick="triggerVent()">VENT</button>
+            <button class="action-btn" onclick="triggerKill()">KILL</button>
+        </div>
+
+        <div class="screen" id="menu-screen">
+            <h1>SPACE HUNT</h1>
+            <p>SABOTAGE & ELIMINATE THE CREW</p>
+            <button class="menu-btn" onclick="initGame()">START HUNT</button>
+        </div>
+
+        <div class="screen" id="victory-screen" style="display: none;">
+            <h1 style="color: #00ffcc; text-shadow: 0 0 10px rgba(0,255,204,0.5);">VICTORY!</h1>
+            <p>You successfully eliminated the crew undetected.</p>
+            <button class="menu-btn" onclick="showMenu()">MAIN MENU</button>
+        </div>
+
+        <div class="screen" id="defeat-screen" style="display: none;">
+            <h1 style="color: #ff3333; text-shadow: 0 0 10px rgba(255,51,51,0.5);">EJECTED!</h1>
+            <p id="defeat-reason">You were caught red-handed killing a crewmate.</p>
+            <button class="menu-btn" onclick="initGame()">TRY AGAIN</button>
+        </div>
+    </div>
+
+    <script>
+        // Sound Generator Engine
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playAudioSignal(style) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+
+            if (style === 'kill') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(60, audioCtx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+            } else if (style === 'alarm') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(400, audioCtx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+            } else if (style === 'vent') {
+                osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.15);
+            }
+        }
+    </script>
+
+    <script>
+        const canvas = document.getElementById('spaceCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let running = false;
+        let player = { x: 200, y: 450, r: 15, speed: 4, isVented: false };
+        let crewmates = [];
+        let vents = [
+            { x: 80, y: 120, r: 18 },
+            { x: 320, y: 120, r: 18 },
+            { x: 200, y: 300, r: 18 },
+            { x: 80, y: 480, r: 18 },
+            { x: 320, y: 480, r: 18 }
+        ];
+
+        const colors = ['#00ffcc', '#ffcc00', '#ff00ff', '#ffffff', '#ff9900'];
+
+        function initGame() {
+            // Set displays
+            document.getElementById('menu-screen').style.display = 'none';
+            document.getElementById('victory-screen').style.display = 'none';
+            document.getElementById('defeat-screen').style.display = 'none';
+            document.getElementById('game-controls').style.display = 'flex';
+
+            player.x = 200; player.y = 450; player.isVented = false;
+            crewmates = [];
+
+            // Spawn 5 wandering automated crew bots
+            for(let i=0; i<5; i++) {
+                crewmates.push({
+                    x: Math.random() * 300 + 50,
+                    y: Math.random() * 350 + 80,
+                    r: 15,
+                    color: colors[i],
+                    vx: (Math.random() - 0.5) * 3,
+                    vy: (Math.random() - 0.5) * 3,
+                    alive: true
+                });
+            }
+
+            running = true;
+            updateUI();
+        }
+
+        function showMenu() {
+            document.getElementById('victory-screen').style.display = 'none';
+            document.getElementById('menu-screen').style.display = 'flex';
+        }
+
+        // Swipe Gesture Handling Logic
+        let sX = 0, sY = 0;
+        window.addEventListener('touchstart', e => {
+            sX = e.touches[0].clientX; sY = e.touches[0].clientY;
+        }, { passive: true });
+
+        window.addEventListener('touchend', e => {
+            if (!running || player.isVented) return;
+            let dX = e.changedTouches[0].clientX - sX, dY = e.changedTouches[0].clientY - sY;
+            if (Math.abs(dX) > Math.abs(dY)) {
+                if (Math.abs(dX) > 20) player.x += dX > 0 ? player.speed * 4 : -player.speed * 4;
+            } else {
+                if (Math.abs(dY) > 20) player.y += dY > 0 ? player.speed * 4 : -player.speed * 4;
+            }
+            keepInBounds(player);
+        }, { passive: true });
+
+        // Keyboard support for testing/PC
+        window.addEventListener('keydown', e => {
+            if (!running || player.isVented) return;
+            if (e.key === 'ArrowLeft' || e.key === 'a') player.x -= player.speed * 5;
+            if (e.key === 'ArrowRight' || e.key === 'd') player.x += player.speed * 5;
+            if (e.key === 'ArrowUp' || e.key === 'w') player.y -= player.speed * 5;
+            if (e.key === 'ArrowDown' || e.key === 's') player.y += player.speed * 5;
+            keepInBounds(player);
+        });
+
+        function keepInBounds(obj) {
+            if (obj.x < obj.r) obj.x = obj.r;
+            if (obj.x > canvas.width - obj.r) obj.x = canvas.width - obj.r;
+            if (obj.y < 60 + obj.r) obj.y = 60 + obj.r;
+            if (obj.y > canvas.height - obj.r) obj.y = canvas.height - obj.r;
+        }
+
+        // Action Command: KILL
+        function triggerKill() {
+            if (!running || player.isVented) return;
+
+            let closest = null;
+            let minDist = 45; // Killing interaction radius
+
+            crewmates.forEach(c => {
+                if (!c.alive) return;
+                let dist = Math.hypot(player.x - c.x, player.y - c.y);
+                if (dist < minDist) { minDist = dist; closest = c; }
+            });
+
+            if (closest) {
+                closest.alive = false;
+                playAudioSignal('kill');
+                
+                // Integrity Scan: Check if another living crewmate saw the incident
+                let witnessed = false;
+                crewmates.forEach(witness => {
+                    if (witness === closest || !witness.alive) return;
+                    let viewDist = Math.hypot(closest.x - witness.x, closest.y - witness.y);
+                    if (viewDist < 120) { witnessed = true; } // Witness detection range
+                });
+
+                if (witnessed) {
+                    triggerGameOver(false, "Another crewmate saw you eliminate someone!");
+                } else {
+                    updateUI();
+                    checkVictoryCondition();
+                }
+            }
+        }
+
+        // Action Command: VENT SYSTEM
+        function triggerVent() {
+            if (!running) return;
+
+            if (player.isVented) {
+                // Pop back out into reality
+                player.isVented = false;
+                playAudioSignal('vent');
+            } else {
+                // Check if positioned over a structural vent hub
+                vents.forEach(v => {
+                    let distance = Math.hypot(player.x - v.x, player.y - v.y);
+                    if (distance < v.r + 5) {
+                        player.isVented = true;
+                        player.x = v.x; player.y = v.y; // Snap onto center anchor
+                        playAudioSignal('vent');
+                    }
+                });
+            }
+        }
+
+        function checkVictoryCondition() {
+            let survivors = crewmates.filter(c => c.alive).length;
+            if (survivors === 0) {
+                running = false;
+                document.getElementById('game-controls').style.display = 'none';
+                document.getElementById('victory-screen').style.display = 'flex';
+            }
+        }
+
+        function triggerGameOver(win, reason) {
+            running = false;
+            playAudioSignal('alarm');
+            document.getElementById('game-controls').style.display = 'none';
+            document.getElementById('defeat-reason').innerText = reason;
+            document.getElementById('defeat-screen').style.display = 'flex';
+        }
+
+        function updateUI() {
+            let left = crewmates.filter(c => c.alive).length;
+            document.getElementById('hud-left').innerText = left;
+        }
+
+        // Simulation Update Engines
+        function tick() {
+            if (running) {
+                crewmates.forEach(c => {
+                    if (!c.alive) return;
+                    
+                    // Wandering algorithm loop logic
+                    c.x += c.vx; c.y += c.vy;
+
+                    // Bounce vectors off walls
+                    if (c.x < c.r || c.x > canvas.width - c.r) c.vx *= -1;
+                    if (c.y < 60 + c.r || c.y > canvas.height - c.r) c.vy *= -1;
+
+                    // Dynamic redirect patterns randomly
+                    if (Math.random() < 0.02) {
+                        c.vx = (Math.random() - 0.5) * 3;
+                        c.vy = (Math.random() - 0.5) * 3;
+                    }
+
+                    // Automatic proximity scanner: If walking directly into hidden imposter
+                    if (!player.isVented) {
+                        let proximity = Math.hypot(c.x - player.x, c.y - player.y);
+                        if (proximity < c.r + player.r - 2) {
+                            // Caught touching illegally
+                        }
+                    }
+                });
+            }
+        }
+
+        // Graphical Interface Drawing Screen Map
+        function drawScene() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Render Structural Vents
+            vents.forEach(v => {
+                ctx.fillStyle = '#333'; ctx.beginPath();
+                ctx.arc(v.x, v.y, v.r, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = '#555'; ctx.lineWidth = 3; ctx.stroke();
+                
+                // Grille lines design details
+                ctx.strokeStyle = '#222'; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.moveTo(v.x - 10, v.y); ctx.lineTo(v.x + 10, v.y); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(v.x - 8, v.y - 6); ctx.lineTo(v.x + 8, v.y - 6); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(v.x - 8, v.y + 6); ctx.lineTo(v.x + 8, v.y + 6); ctx.stroke();
+            });
+
+            // Render Dead Bodies first to keep underneath layers organized
+            crewmates.forEach(c => {
+                if (!c.alive) {
+                    ctx.fillStyle = '#555555'; ctx.beginPath();
+                    ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2); ctx.fill();
+                    // Draw white bone fragment graphic setup
+                    ctx.fillStyle = '#fff'; ctx.fillRect(c.x - 3, c.y - 4, 6, 8);
+                }
+            });
+
+            // Render Alive Crew Entities
+            crewmates.forEach(c => {
+                if (c.alive) {
+                    ctx.fillStyle = c.color; ctx.beginPath();
+                    ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2); ctx.fill();
+                    
+                    // Visor glass mask window details facing down/rightwards
+                    ctx.fillStyle = '#a6d8f0';
+                    ctx.fillRect(c.x + 2, c.y - 6, 9, 7);
+                }
+            });
+
+            // Render Player Subject
+            if (!player.isVented) {
+                ctx.fillStyle = '#ff3333'; // Crimson Red Imposter signature styling
+                ctx.beginPath(); ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+
+                // Dark Visor plate look
+                ctx.fillStyle = '#3a4454';
+                ctx.fillRect(player.x + 2, player.y - 6, 9, 7);
+            }
+        }
+
+        function engineLoop() {
+            tick();
+            drawScene();
+            requestAnimationFrame(engineLoop);
+        }
+
+        // Initialize display configuration matrices
+        engineLoop();
+    </script>
+</body>
+</html>
