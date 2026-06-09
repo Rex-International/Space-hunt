@@ -4,380 +4,551 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Space Hunt - Stealth Arcade</title>
+    <title>Space Hunt: Pro Edition</title>
     <style>
+        :root {
+            --primary: #00ffff;
+            --bg-dark: #0a0c10;
+            --panel: #141923;
+            --red: #ff3333;
+            --green: #00ffcc;
+        }
         * { box-sizing: border-box; user-select: none; touch-action: none; }
         body {
-            margin: 0; padding: 0; background: #0b0c10;
+            margin: 0; padding: 0; background: var(--bg-dark);
             font-family: 'Segoe UI', Roboto, sans-serif;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             min-height: 100vh; color: #fff; overflow: hidden;
         }
         #game-container {
-            width: 100%; max-width: 400px; height: 600px;
-            background: #1f2833;
-            position: relative; overflow: hidden; border: 4px solid #45f3ff; border-radius: 12px;
-            box-shadow: 0 0 20px rgba(69, 243, 255, 0.3);
+            width: 100%; max-width: 400px; height: 640px;
+            background: #11141a;
+            position: relative; overflow: hidden; border: 3px solid #1a2233; border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
         }
-        canvas { display: block; background: #11141a; }
+        canvas { display: block; }
         
-        /* HUD Top Layer */
-        .hud {
+        /* HUD UI */
+        .hud-top {
             position: absolute; top: 12px; left: 12px; right: 12px;
-            display: flex; justify-content: space-between; pointer-events: none;
-            z-index: 5;
+            display: flex; justify-content: space-between; pointer-events: none; z-index: 5;
         }
-        .hud-item {
-            background: rgba(0, 0, 0, 0.7); padding: 6px 14px; border-radius: 20px;
-            font-weight: bold; font-size: 13px; border: 1px solid #45f3ff;
-            letter-spacing: 1px;
+        .badge {
+            background: rgba(10, 12, 16, 0.85); padding: 6px 14px; border-radius: 8px;
+            font-weight: bold; font-size: 12px; border: 1px solid #223147;
+            letter-spacing: 1px; backdrop-filter: blur(4px);
         }
 
-        /* Action Controls Block */
-        .control-bar {
-            position: absolute; bottom: 20px; left: 0; right: 0;
-            display: flex; justify-content: center; gap: 20px; z-index: 5;
-            padding: 0 20px;
+        /* Controls Panel */
+        .control-panel {
+            position: absolute; bottom: 15px; left: 12px; right: 12px;
+            display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; z-index: 5;
         }
-        .action-btn {
-            background: #ff3333; color: #fff; border: none; width: 75px; height: 75px;
-            border-radius: 50%; font-weight: bold; font-size: 16px; cursor: pointer;
-            box-shadow: 0 4px 15px rgba(255, 51, 51, 0.4); border: 2px solid #fff;
+        .btn {
+            background: rgba(20, 25, 35, 0.9); color: #fff; border: 2px solid #2c3a52;
+            padding: 12px 5px; border-radius: 10px; font-weight: bold; font-size: 12px;
+            cursor: pointer; text-align: center; backdrop-filter: blur(4px);
+            transition: all 0.1s;
         }
-        .action-btn:active { transform: scale(0.9); }
-        .vent-btn { background: #00bfff; box-shadow: 0 4px 15px rgba(0, 191, 255, 0.4); }
+        .btn:active { transform: scale(0.95); }
+        .btn-kill { background: rgba(255, 51, 51, 0.2); border-color: var(--red); color: #ff9999; }
+        .btn-kill.ready { background: var(--red); color: #fff; animation: pulse 1s infinite alternate; }
+        .btn-sabotage { background: rgba(255, 153, 0, 0.2); border-color: #ff9900; color: #ffcc66; }
 
-        /* Full Screen Overlays */
+        @keyframes pulse { 0% { box-shadow: 0 0 5px var(--red); } 100% { box-shadow: 0 0 15px var(--red); } }
+
+        /* Screens overlays */
         .screen {
             position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(11, 12, 16, 0.95); display: flex; flex-direction: column;
-            align-items: center; justify-content: center; z-index: 10; padding: 25px;
+            background: rgba(6, 8, 12, 0.98); display: flex; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 10; padding: 24px;
             text-align: center;
         }
-        .screen h1 { color: #45f3ff; font-size: 36px; margin: 0 0 10px 0; text-shadow: 0 0 10px rgba(69,243,255,0.5); }
-        .screen p { font-size: 14px; margin: 0 0 25px 0; color: #c5a1ff; font-weight: bold; }
+        .screen h1 { color: var(--primary); font-size: 38px; margin: 0 0 8px 0; letter-spacing: 2px; }
+        .screen p { font-size: 14px; margin: 0 0 24px 0; color: #6c7d93; }
         
-        button.menu-btn {
-            background: #45f3ff; color: #0b0c10; border: none; padding: 14px 35px;
-            font-size: 16px; font-weight: bold; border-radius: 25px; cursor: pointer;
-            box-shadow: 0 4px 10px rgba(69,243,255,0.3); width: 85%; margin: 8px 0;
+        .menu-btn {
+            background: var(--primary); color: var(--bg-dark); border: none; padding: 14px;
+            font-size: 15px; font-weight: bold; border-radius: 12px; cursor: pointer;
+            width: 100%; max-width: 280px; margin: 6px 0; box-shadow: 0 4px 14px rgba(0,255,255,0.3);
         }
-        button.menu-btn:active { transform: scale(0.95); }
+        .btn-whatsapp { background: #25D366 !important; color: #fff !important; box-shadow: 0 4px 14px rgba(37,211,102,0.3) !important; }
+
+        /* Joystick Emulator Pad */
+        #joy-pad {
+            position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%);
+            width: 90px; height: 90px; background: rgba(255,255,255,0.03);
+            border: 2px dashed rgba(255,255,255,0.2); border-radius: 50%; z-index: 4;
+            display: flex; align-items: center; justify-content: center; pointer-events: none;
+        }
+        #joy-stick { width: 35px; height: 35px; background: rgba(0,255,255,0.4); border-radius: 50%; border: 1px solid var(--primary); }
     </style>
 </head>
 <body>
 
     <div id="game-container">
-        <div class="hud">
-            <div class="hud-item">TARGETS LEFT: <span id="hud-left">0</span></div>
-            <div class="hud-item" style="color: #ff3333;">ROLE: IMPOSTOR</div>
+        <div class="hud-top">
+            <div class="badge" style="color: var(--primary)">ROOM: <span id="hud-room">Cafeteria</span></div>
+            <div class="badge">CREW LEFT: <span id="hud-left">0</span></div>
         </div>
 
-        <canvas id="spaceCanvas" width="400" height="600"></canvas>
+        <canvas id="proSpaceCanvas" width="400" height="640"></canvas>
 
-        <div class="control-bar" id="game-controls" style="display: none;">
-            <button class="action-btn vent-btn" onclick="triggerVent()">VENT</button>
-            <button class="action-btn" onclick="triggerKill()">KILL</button>
+        <div id="joy-pad"><div id="joy-stick"></div></div>
+
+        <div class="control-panel" id="control-panel" style="display: none;">
+            <button class="btn btn-sabotage" id="sabotage-btn" onclick="triggerSabotage()">SABOTAGE (30s)</button>
+            <button class="btn" id="vent-btn" onclick="triggerVent()">USE VENT</button>
+            <button class="btn btn-kill" id="kill-btn" onclick="triggerKill()">KILL</button>
         </div>
 
         <div class="screen" id="menu-screen">
-            <h1>SPACE HUNT</h1>
-            <p>SABOTAGE & ELIMINATE THE CREW</p>
-            <button class="menu-btn" onclick="initGame()">START HUNT</button>
+            <h1 style="font-style: italic;">SPACE HUNT</h1>
+            <p>ADVANCED 2D STEALTH SIMULATOR</p>
+            <button class="menu-btn" onclick="initNewGame()">LAUNCH OPERATIVE</button>
         </div>
 
-        <div class="screen" id="victory-screen" style="display: none;">
-            <h1 style="color: #00ffcc; text-shadow: 0 0 10px rgba(0,255,204,0.5);">VICTORY!</h1>
-            <p>You successfully eliminated the crew undetected.</p>
-            <button class="menu-btn" onclick="showMenu()">MAIN MENU</button>
-        </div>
-
-        <div class="screen" id="defeat-screen" style="display: none;">
-            <h1 style="color: #ff3333; text-shadow: 0 0 10px rgba(255,51,51,0.5);">EJECTED!</h1>
-            <p id="defeat-reason">You were caught red-handed killing a crewmate.</p>
-            <button class="menu-btn" onclick="initGame()">TRY AGAIN</button>
+        <div class="screen" id="end-screen" style="display: none;">
+            <h1 id="end-title">VICTORY</h1>
+            <p id="end-desc">All targets neutralized cleanly.</p>
+            <button class="menu-btn" onclick="initNewGame()">PLAY AGAIN</button>
+            <button class="menu-btn btn-whatsapp" onclick="shareStatsWhatsApp()">SHARE TO WHATSAPP</button>
+            <button class="menu-btn" style="background:#2c3a52; color:#fff; box-shadow:none;" onclick="backToMenu()">MAIN MENU</button>
         </div>
     </div>
 
     <script>
-        // Sound Generator Engine
+        // Web Audio Procedural Synthesis Sound Engine 
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        function playAudioSignal(style) {
+        function playSfx(type) {
             if (audioCtx.state === 'suspended') audioCtx.resume();
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.connect(gain); gain.connect(audioCtx.destination);
 
-            if (style === 'kill') {
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(180, audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(60, audioCtx.currentTime + 0.2);
+            if (type === 'kill') {
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(140, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(30, audioCtx.currentTime + 0.25);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.25);
+            } else if (type === 'vent') {
+                osc.type = 'triangle'; osc.frequency.setValueAtTime(90, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(350, audioCtx.currentTime + 0.18);
                 gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-                osc.start(); osc.stop(audioCtx.currentTime + 0.2);
-            } else if (style === 'alarm') {
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
-                osc.frequency.linearRampToValueAtTime(400, audioCtx.currentTime + 0.3);
-                gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
-                osc.start(); osc.stop(audioCtx.currentTime + 0.3);
-            } else if (style === 'vent') {
-                osc.frequency.setValueAtTime(120, audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.15);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.18);
+            } else if (type === 'sabotage') {
+                osc.type = 'square'; osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(110, audioCtx.currentTime + 0.15);
                 gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-                osc.start(); osc.stop(audioCtx.currentTime + 0.15);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'alert') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(900, audioCtx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.2);
             }
         }
     </script>
 
     <script>
-        const canvas = document.getElementById('spaceCanvas');
+        const canvas = document.getElementById('proSpaceCanvas');
         const ctx = canvas.getContext('2d');
 
-        let running = false;
-        let player = { x: 200, y: 450, r: 15, speed: 4, isVented: false };
+        let isRunning = false;
+        let killCooldown = 0;
+        let sabotageTimer = 0;
+        let currentRoomName = "Cafeteria";
+        let killCount = 0;
+
+        // Player configuration matrix
+        let player = { x: 200, y: 320, r: 12, speed: 3.5, vx: 0, vy: 0, isVented: false };
         let crewmates = [];
-        let vents = [
-            { x: 80, y: 120, r: 18 },
-            { x: 320, y: 120, r: 18 },
-            { x: 200, y: 300, r: 18 },
-            { x: 80, y: 480, r: 18 },
-            { x: 320, y: 480, r: 18 }
+        let particles = [];
+
+        // Map layout: Professional wall blocks configuration setup (Collision Map)
+        const walls = [
+            // Perimeter boundaries
+            {x: 0, y: 50, w: 400, h: 15},
+            {x: 0, y: 530, w: 400, h: 15},
+            {x: 0, y: 50, w: 15, h: 495},
+            {x: 385, y: 50, w: 15, h: 495},
+            // Center Blocks / Room Partitioning Structures
+            {x: 130, y: 150, w: 140, h: 20}, // Top lab divider
+            {x: 60, y: 260, w: 100, h: 80},  // Engine Reactor room block left
+            {x: 240, y: 260, w: 100, h: 80}   // Electrical center vault block right
         ];
 
-        const colors = ['#00ffcc', '#ffcc00', '#ff00ff', '#ffffff', '#ff9900'];
+        // Specific Named Zone Rooms Coordinates
+        const zones = [
+            { name: "MedBay Lab", x1: 15, y1: 65, x2: 385, y2: 170 },
+            { name: "Reactor Main", x1: 15, y1: 170, x2: 160, y2: 360 },
+            { name: "Electrical Room", x1: 240, y1: 170, x2: 385, y2: 360 },
+            { name: "Cafeteria Center", x1: 15, y1: 360, x2: 385, y2: 530 }
+        ];
 
-        function initGame() {
-            // Set displays
+        // Structural Underground Vent network access nodes
+        const vents = [
+            { x: 45, y: 95, id: 'V1' },
+            { x: 355, y: 95, id: 'V2' },
+            { x: 45, y: 495, id: 'V3' },
+            { x: 355, y: 495, id: 'V4' }
+        ];
+
+        const colors = ['#00ffcc', '#ffcc00', '#ff00ff', '#ffffff', '#33ccff', '#99ff33'];
+
+        function initNewGame() {
             document.getElementById('menu-screen').style.display = 'none';
-            document.getElementById('victory-screen').style.display = 'none';
-            document.getElementById('defeat-screen').style.display = 'none';
-            document.getElementById('game-controls').style.display = 'flex';
+            document.getElementById('end-screen').style.display = 'none';
+            document.getElementById('control-panel').style.display = 'grid';
 
-            player.x = 200; player.y = 450; player.isVented = false;
-            crewmates = [];
+            player.x = 200; player.y = 440; player.vx = 0; player.vy = 0; player.isVented = false;
+            killCooldown = 0; sabotageTimer = 0; killCount = 0;
+            crewmates = []; particles = [];
 
-            // Spawn 5 wandering automated crew bots
-            for(let i=0; i<5; i++) {
+            // Spawn Advanced Automated AI Bots
+            for(let i=0; i<6; i++) {
                 crewmates.push({
-                    x: Math.random() * 300 + 50,
-                    y: Math.random() * 350 + 80,
-                    r: 15,
-                    color: colors[i],
-                    vx: (Math.random() - 0.5) * 3,
-                    vy: (Math.random() - 0.5) * 3,
-                    alive: true
+                    x: 60 + Math.random() * 280,
+                    y: 90 + Math.random() * 400,
+                    r: 11, color: colors[i],
+                    vx: (Math.random() - 0.5) * 2,
+                    vy: (Math.random() - 0.5) * 2,
+                    alive: true, taskTimer: Math.random() * 100, isStationary: false
                 });
             }
+            // Clear overlapping initial spawns inside architectural walls
+            crewmates.forEach(c => resolveWallCollisions(c));
 
-            running = true;
-            updateUI();
+            isRunning = true;
+            updateStatusHUD();
         }
 
-        function showMenu() {
-            document.getElementById('victory-screen').style.display = 'none';
-            document.getElementById('menu-screen').style.display = 'flex';
-        }
-
-        // Swipe Gesture Handling Logic
-        let sX = 0, sY = 0;
+        // Swipe Interface Touch Mechanics
+        let startTouchX = 0, startTouchY = 0;
         window.addEventListener('touchstart', e => {
-            sX = e.touches[0].clientX; sY = e.touches[0].clientY;
+            startTouchX = e.touches[0].clientX; startTouchY = e.touches[0].clientY;
         }, { passive: true });
 
-        window.addEventListener('touchend', e => {
-            if (!running || player.isVented) return;
-            let dX = e.changedTouches[0].clientX - sX, dY = e.changedTouches[0].clientY - sY;
-            if (Math.abs(dX) > Math.abs(dY)) {
-                if (Math.abs(dX) > 20) player.x += dX > 0 ? player.speed * 4 : -player.speed * 4;
-            } else {
-                if (Math.abs(dY) > 20) player.y += dY > 0 ? player.speed * 4 : -player.speed * 4;
+        window.addEventListener('touchmove', e => {
+            if (!isRunning || player.isVented) return;
+            let currentTouchX = e.touches[0].clientX;
+            let currentTouchY = e.touches[0].clientY;
+            
+            let dX = currentTouchX - startTouchX;
+            let dY = currentTouchY - startTouchY;
+            let magnitude = Math.hypot(dX, dY);
+
+            if (magnitude > 10) {
+                // Apply scaled velocity vectors
+                player.vx = (dX / magnitude) * player.speed;
+                player.vy = (dY / magnitude) * player.speed;
+                
+                // Update joystick display feedback indicator knob asset visually
+                let jKnob = document.getElementById('joy-stick');
+                jKnob.style.transform = `translate(${Math.min(Math.max(dX,-30),30)}px, ${Math.min(Math.max(dY,-30),30)}px)`;
             }
-            keepInBounds(player);
         }, { passive: true });
 
-        // Keyboard support for testing/PC
+        window.addEventListener('touchend', () => {
+            player.vx = 0; player.vy = 0;
+            document.getElementById('joy-stick').style.transform = 'translate(0px, 0px)';
+        }, { passive: true });
+
+        // Backup PC Keyboard configuration matrices
         window.addEventListener('keydown', e => {
-            if (!running || player.isVented) return;
-            if (e.key === 'ArrowLeft' || e.key === 'a') player.x -= player.speed * 5;
-            if (e.key === 'ArrowRight' || e.key === 'd') player.x += player.speed * 5;
-            if (e.key === 'ArrowUp' || e.key === 'w') player.y -= player.speed * 5;
-            if (e.key === 'ArrowDown' || e.key === 's') player.y += player.speed * 5;
-            keepInBounds(player);
+            if(!isRunning || player.isVented) return;
+            if(e.key === 'ArrowLeft' || e.key === 'a') player.vx = -player.speed;
+            if(e.key === 'ArrowRight' || e.key === 'd') player.vx = player.speed;
+            if(e.key === 'ArrowUp' || e.key === 'w') player.vy = -player.speed;
+            if(e.key === 'ArrowDown' || e.key === 's') player.vy = player.speed;
+        });
+        window.addEventListener('keyup', e => {
+            if(['ArrowLeft','a','ArrowRight','d'].includes(e.key)) player.vx = 0;
+            if(['ArrowUp','w','ArrowDown','s'].includes(e.key)) player.vy = 0;
         });
 
-        function keepInBounds(obj) {
-            if (obj.x < obj.r) obj.x = obj.r;
-            if (obj.x > canvas.width - obj.r) obj.x = canvas.width - obj.r;
-            if (obj.y < 60 + obj.r) obj.y = 60 + obj.r;
-            if (obj.y > canvas.height - obj.r) obj.y = canvas.height - obj.r;
+        // Resolve structural bounding box collisions 
+        function resolveWallCollisions(entity) {
+            walls.forEach(w => {
+                let closestX = Math.max(w.x, Math.min(entity.x, w.x + w.w));
+                let closestY = Math.max(w.y, Math.min(entity.y, w.y + w.h));
+                let distance = Math.hypot(entity.x - closestX, entity.y - closestY);
+
+                if (distance < entity.r) {
+                    let overlap = entity.r - distance;
+                    // Determine normal vector angle of correction axis adjustment
+                    if (distance === 0) return; 
+                    entity.x += ((entity.x - closestX) / distance) * overlap;
+                    entity.y += ((entity.y - closestY) / distance) * overlap;
+                    
+                    // Invert velocity trajectories if tracking bot entity
+                    if (entity !== player) {
+                        if (Math.abs(entity.x - closestX) > Math.abs(entity.y - closestY)) entity.vx *= -1;
+                        else entity.vy *= -1;
+                    }
+                }
+            });
         }
 
-        // Action Command: KILL
+        // Action Command Trigger: KILL
         function triggerKill() {
-            if (!running || player.isVented) return;
+            if (!isRunning || player.isVented || killCooldown > 0) return;
 
-            let closest = null;
-            let minDist = 45; // Killing interaction radius
+            let closestCrew = null;
+            let shortestDist = 42; // Professional interaction sweep range radius
 
             crewmates.forEach(c => {
                 if (!c.alive) return;
-                let dist = Math.hypot(player.x - c.x, player.y - c.y);
-                if (dist < minDist) { minDist = dist; closest = c; }
+                let d = Math.hypot(player.x - c.x, player.y - c.y);
+                if (d < shortestDist) { shortestDist = d; closestCrew = c; }
             });
 
-            if (closest) {
-                closest.alive = false;
-                playAudioSignal('kill');
-                
-                // Integrity Scan: Check if another living crewmate saw the incident
-                let witnessed = false;
-                crewmates.forEach(witness => {
-                    if (witness === closest || !witness.alive) return;
-                    let viewDist = Math.hypot(closest.x - witness.x, closest.y - witness.y);
-                    if (viewDist < 120) { witnessed = true; } // Witness detection range
+            if (closestCrew) {
+                closestCrew.alive = false;
+                killCount++;
+                killCooldown = 160; // Tick counts recovery matrix initialization reset loop
+                playSfx('kill');
+
+                // Generate advanced particle explosion system effects dynamically
+                for(let i=0; i<12; i++) {
+                    particles.push({
+                        x: closestCrew.x, y: closestCrew.y,
+                        vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4,
+                        life: 25, color: '#ff3333'
+                    });
+                }
+
+                // AI Line of Sight Vision Check Verification Loops
+                let flagAlert = false;
+                crewmates.forEach(w => {
+                    if (w === closestCrew || !w.alive) return;
+                    let sightRange = sabotageTimer > 0 ? 65 : 135; // Lights out limits sight range drastically!
+                    let dWitness = Math.hypot(closestCrew.x - w.x, closestCrew.y - w.y);
+                    
+                    if (dWitness < sightRange) { flagAlert = true; }
                 });
 
-                if (witnessed) {
-                    triggerGameOver(false, "Another crewmate saw you eliminate someone!");
+                if (flagAlert) {
+                    endGameSession(false, "EJECTED!", "A crewmate witnessed the elimination and called an emergency vote!");
                 } else {
-                    updateUI();
-                    checkVictoryCondition();
+                    updateStatusHUD();
+                    checkMatchEndMetrics();
                 }
             }
         }
 
-        // Action Command: VENT SYSTEM
+        // Action Command Trigger: VENT HUB TRANSPORT MECHANISM
         function triggerVent() {
-            if (!running) return;
+            if (!isRunning) return;
 
             if (player.isVented) {
-                // Pop back out into reality
+                // Exit system nodes mechanics
                 player.isVented = false;
-                playAudioSignal('vent');
+                playSfx('vent');
             } else {
-                // Check if positioned over a structural vent hub
                 vents.forEach(v => {
-                    let distance = Math.hypot(player.x - v.x, player.y - v.y);
-                    if (distance < v.r + 5) {
+                    let dVent = Math.hypot(player.x - v.x, player.y - v.y);
+                    if (dVent < 22) {
                         player.isVented = true;
-                        player.x = v.x; player.y = v.y; // Snap onto center anchor
-                        playAudioSignal('vent');
+                        player.x = v.x; player.y = v.y; // Lock coords directly over asset hub center lines
+                        player.vx = 0; player.vy = 0;
+                        playSfx('vent');
                     }
                 });
             }
         }
 
-        function checkVictoryCondition() {
-            let survivors = crewmates.filter(c => c.alive).length;
-            if (survivors === 0) {
-                running = false;
-                document.getElementById('game-controls').style.display = 'none';
-                document.getElementById('victory-screen').style.display = 'flex';
+        // Action Command Trigger: SABOTAGE REACTOR LIGHTING GRID GRID MATRIX SYSTEM
+        function triggerSabotage() {
+            if (!isRunning || sabotageTimer > 0) return;
+            sabotageTimer = 400; // Frame counter limits update setup duration tracking loops
+            playSfx('sabotage');
+        }
+
+        function checkMatchEndMetrics() {
+            let left = crewmates.filter(c => c.alive).length;
+            if (left === 0) {
+                endGameSession(true, "VICTORY!", `Mission complete. You eliminated all targets.`);
             }
         }
 
-        function triggerGameOver(win, reason) {
-            running = false;
-            playAudioSignal('alarm');
-            document.getElementById('game-controls').style.display = 'none';
-            document.getElementById('defeat-reason').innerText = reason;
-            document.getElementById('defeat-screen').style.display = 'flex';
+        function endGameSession(isWin, title, desc) {
+            isRunning = false;
+            if(!isWin) playSfx('alert');
+            document.getElementById('control-panel').style.style = 'none';
+            document.getElementById('end-title').innerText = title;
+            document.getElementById('end-title').style.color = isWin ? 'var(--green)' : 'var(--red)';
+            document.getElementById('end-desc').innerText = desc;
+            document.getElementById('end-screen').style.display = 'flex';
         }
 
-        function updateUI() {
-            let left = crewmates.filter(c => c.alive).length;
-            document.getElementById('hud-left').innerText = left;
+        function backToMenu() {
+            document.getElementById('end-screen').style.display = 'none';
+            document.getElementById('menu-screen').style.display = 'flex';
         }
 
-        // Simulation Update Engines
-        function tick() {
-            if (running) {
+        function shareStatsWhatsApp() {
+            let msg = `🚀 SPACE HUNT PRO ARCHIVES 🚀\n\nI just executed an elite covert operation inside Space Hunt!\n💥 Targets Vaporized: ${killCount}\n🏆 Tactical Result: COMPLETED UNDETECTED\n\nCan you beat my ghost score? Take the challenge now! 🕵️‍♂️`;
+            window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
+        }
+
+        function updateStatusHUD() {
+            let remain = crewmates.filter(c => c.alive).length;
+            document.getElementById('hud-left').innerText = remain;
+
+            // Manage live update metrics to structural layout strings
+            zones.forEach(z => {
+                if (player.x >= z.x1 && player.x <= z.x2 && player.y >= z.y1 && player.y <= z.y2) {
+                    currentRoomName = z.name;
+                }
+            });
+            document.getElementById('hud-room').innerText = currentRoomName;
+
+            // Handle UI button visual system updates
+            let kBtn = document.getElementById('kill-btn');
+            if (killCooldown <= 0) {
+                kBtn.innerText = "KILL READY"; kBtn.classList.add('ready');
+            } else {
+                kBtn.innerText = `CD (${Math.ceil(killCooldown/60)}s)`; kBtn.classList.remove('ready');
+            }
+
+            let sBtn = document.getElementById('sabotage-btn');
+            if (sabotageTimer > 0) {
+                sBtn.innerText = `SABOTAGE (${Math.ceil(sabotageTimer/60)}s)`; sBtn.style.opacity = 0.4;
+            } else {
+                sBtn.innerText = "SABOTAGE"; sBtn.style.opacity = 1;
+            }
+        }
+
+        // Framework Engine Simulation Process Updates
+        function processSim() {
+            if (isRunning) {
+                if (killCooldown > 0) { killCooldown--; if(killCooldown===0) updateStatusHUD(); }
+                if (sabotageTimer > 0) { sabotageTimer--; if(sabotageTimer===0) updateStatusHUD(); }
+
+                // Player Movement translation
+                if (!player.isVented) {
+                    player.x += player.vx; player.y += player.vy;
+                    resolveWallCollisions(player);
+                }
+
+                // AI Behavior System Loop Loops
                 crewmates.forEach(c => {
                     if (!c.alive) return;
-                    
-                    // Wandering algorithm loop logic
-                    c.x += c.vx; c.y += c.vy;
 
-                    // Bounce vectors off walls
-                    if (c.x < c.r || c.x > canvas.width - c.r) c.vx *= -1;
-                    if (c.y < 60 + c.r || c.y > canvas.height - c.r) c.vy *= -1;
-
-                    // Dynamic redirect patterns randomly
-                    if (Math.random() < 0.02) {
-                        c.vx = (Math.random() - 0.5) * 3;
-                        c.vy = (Math.random() - 0.5) * 3;
-                    }
-
-                    // Automatic proximity scanner: If walking directly into hidden imposter
-                    if (!player.isVented) {
-                        let proximity = Math.hypot(c.x - player.x, c.y - player.y);
-                        if (proximity < c.r + player.r - 2) {
-                            // Caught touching illegally
+                    c.taskTimer--;
+                    if (c.taskTimer <= 0) {
+                        c.isStationary = !c.isStationary;
+                        c.taskTimer = Math.random() * 200 + 100;
+                        if (!c.isStationary) {
+                            c.vx = (Math.random() - 0.5) * 2.5;
+                            c.vy = (Math.random() - 0.5) * 2.5;
                         }
                     }
+
+                    if (!c.isStationary) {
+                        c.x += c.vx; c.y += c.vy;
+                        resolveWallCollisions(c);
+                    }
                 });
+
+                // Particle systems tick handling matrix
+                particles.forEach((p, idx) => {
+                    p.x += p.vx; p.y += p.vy; p.life--;
+                    if (p.life <= 0) particles.splice(idx, 1);
+                });
+
+                // Real-time tracking refresh call
+                if (Math.random() < 0.01) updateStatusHUD();
             }
         }
 
-        // Graphical Interface Drawing Screen Map
-        function drawScene() {
+        // Rendering Graphics Pipeline Frame Construction Callbacks
+        function drawPipeline() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Render Structural Vents
+            // Draw Professional High-Tech Floor Grids Tiles
+            ctx.strokeStyle = '#161d26'; ctx.lineWidth = 1;
+            for(let g=0; g<canvas.width; g+=40) {
+                ctx.beginPath(); ctx.moveTo(g, 50); ctx.lineTo(g, 530); ctx.stroke();
+            }
+            for(let g=50; g<530; g+=40) {
+                ctx.beginPath(); ctx.moveTo(0, g); ctx.lineTo(canvas.width, g); ctx.stroke();
+            }
+
+            // Draw Cyber Access Vents Hub Outlines
             vents.forEach(v => {
-                ctx.fillStyle = '#333'; ctx.beginPath();
-                ctx.arc(v.x, v.y, v.r, 0, Math.PI * 2); ctx.fill();
-                ctx.strokeStyle = '#555'; ctx.lineWidth = 3; ctx.stroke();
-                
-                // Grille lines design details
-                ctx.strokeStyle = '#222'; ctx.lineWidth = 2;
-                ctx.beginPath(); ctx.moveTo(v.x - 10, v.y); ctx.lineTo(v.x + 10, v.y); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(v.x - 8, v.y - 6); ctx.lineTo(v.x + 8, v.y - 6); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(v.x - 8, v.y + 6); ctx.lineTo(v.x + 8, v.y + 6); ctx.stroke();
+                ctx.fillStyle = '#1c2331'; ctx.beginPath(); ctx.arc(v.x, v.y, 16, 0, Math.PI*2); ctx.fill();
+                ctx.strokeStyle = '#2c3e50'; ctx.lineWidth = 2; ctx.stroke();
+                ctx.fillStyle = '#0a0d14'; ctx.fillRect(v.x - 10, v.y - 3, 20, 6);
             });
 
-            // Render Dead Bodies first to keep underneath layers organized
+            // Draw Extruded Structural Walls
+            ctx.fillStyle = '#1f2937'; ctx.strokeStyle = '#374151'; ctx.lineWidth = 2;
+            walls.forEach(w => {
+                ctx.fillRect(w.x, w.y, w.w, w.h);
+                ctx.strokeRect(w.x, w.y, w.w, w.h);
+            });
+
+            // Render Dead Remains Casings
             crewmates.forEach(c => {
                 if (!c.alive) {
-                    ctx.fillStyle = '#555555'; ctx.beginPath();
-                    ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2); ctx.fill();
-                    // Draw white bone fragment graphic setup
-                    ctx.fillStyle = '#fff'; ctx.fillRect(c.x - 3, c.y - 4, 6, 8);
+                    ctx.fillStyle = '#4b5563'; ctx.beginPath(); ctx.arc(c.x, c.y, c.r, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = '#ffffff'; ctx.fillRect(c.x - 2, c.y - 5, 4, 10); // Bone structure stub
                 }
             });
 
-            // Render Alive Crew Entities
+            // Render Living Crew Assets
             crewmates.forEach(c => {
                 if (c.alive) {
-                    ctx.fillStyle = c.color; ctx.beginPath();
-                    ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2); ctx.fill();
-                    
-                    // Visor glass mask window details facing down/rightwards
-                    ctx.fillStyle = '#a6d8f0';
-                    ctx.fillRect(c.x + 2, c.y - 6, 9, 7);
+                    // Space Suit Main Body
+                    ctx.fillStyle = c.color; ctx.beginPath(); ctx.arc(c.x, c.y, c.r, 0, Math.PI*2); ctx.fill();
+                    // Custom Backpack Tanks Equipment
+                    ctx.fillRect(c.x - c.r - 3, c.y - 6, 4, 12);
+                    // Standard Visor Plate Glass Layouts
+                    ctx.fillStyle = '#22d3ee'; ctx.fillRect(c.x + 2, c.y - 5, 8, 6);
                 }
             });
 
-            // Render Player Subject
+            // Render Player Asset Object Model
             if (!player.isVented) {
-                ctx.fillStyle = '#ff3333'; // Crimson Red Imposter signature styling
-                ctx.beginPath(); ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2); ctx.fill();
-                ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+                ctx.fillStyle = '#ff2222'; ctx.beginPath(); ctx.arc(player.x, player.y, player.r, 0, Math.PI*2); ctx.fill();
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke();
+                // Player Backpack
+                ctx.fillRect(player.x - player.r - 3, player.y - 6, 4, 12);
+                // Menacing Crimson Dark Visor Layout
+                ctx.fillStyle = '#1e293b'; ctx.fillRect(player.x + 2, player.y - 5, 8, 6);
+            }
 
-                // Dark Visor plate look
-                ctx.fillStyle = '#3a4454';
-                ctx.fillRect(player.x + 2, player.y - 6, 9, 7);
+            // Draw Splatter Blood Particles Engine
+            particles.forEach(p => {
+                ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 3, 3);
+            });
+
+            // DYNAMIC ENGINE ADVANCED RENDERING: FOG OF WAR/TOCHI ADVANCED LIGHT EFFECT
+            // This mask creates the dynamic flashlight shader look that gives it the AAA feel!
+            let canvasMask = ctx.createRadialGradient(
+                player.x, player.y, 15, 
+                player.x, player.y, sabotageTimer > 0 ? 55 : 125
+            );
+            
+            if (!player.isVented) {
+                canvasMask.addColorStop(0, 'rgba(0,0,0,0)');
+                canvasMask.addColorStop(0.4, 'rgba(0,0,0,0.1)');
+                canvasMask.addColorStop(1, 'rgba(6,8,12,0.96)'); // Completely dark outside radius lines
+                
+                ctx.fillStyle = canvasMask;
+                ctx.fillRect(0, 50, canvas.width, 480);
             }
         }
 
-        function engineLoop() {
-            tick();
-            drawScene();
-            requestAnimationFrame(engineLoop);
+        function systemMasterLoop() {
+            processSim();
+            drawPipeline();
+            requestAnimationFrame(systemMasterLoop);
         }
 
-        // Initialize display configuration matrices
-        engineLoop();
+        systemMasterLoop();
     </script>
 </body>
 </html>
